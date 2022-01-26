@@ -44,36 +44,45 @@ class AnkiVocabulary:
         with open("words.txt", "r") as file:
             words = file.read().split("\n")
         for word in words:
+            word = word.replace(' ', '')
             try:
-                page = requests.get(base_url.format(word), timeout=0.5).content
+                page = requests.get(base_url.format(word), timeout=0.5)
             except ConnectionError as e:
                 print(e)
                 
                 return("No response")
-            soup = BeautifulSoup(page, "html.parser")
-            sections = soup.find_all("section", class_='gramb')
-            full_definition = ''
-            examples = ''
-            for section in sections:
-                word_type = section.find("span", class_='pos').text
-                if word_type in self.word_type_dic.keys():
-                    word_type = self.word_type_dic[word_type]
-                try:
-                    word_div = section.find('ul', class_='semb').find('div', class_='trg')
-                    defi = word_div.find('p').find('span', class_='ind one-click-content').text.lower()
-                    if word_type == 'verb':
-                        defi = 'to ' + defi
-                    full_definition += word_type + ':  ' + defi[:-1] + ";\n"
-                except:
-                    pass
-                #example
-                try:
-                    example = word_div.find('div', class_='examples').find('li').text
-                    examples = '{}{};\n'.format(examples, example)
-                except:
-                    pass
+            #finding out if word exists
+            if page.status_code == 406:
+                #creating not-found-words-txt file and inserting this word to this file
+                with open('files/not-found.txt', 'a') as not_found_file:
+                    not_found_file.write(word + '\n')
+            else:
+                soup = BeautifulSoup(page.content, "html.parser")
+                sections = soup.find_all("section", class_='gramb')
+                full_definition = ''
+                examples = ''
+                for section in sections:
+                    word_type = section.find("span", class_='pos').text
+                    if word_type in self.word_type_dic.keys():
+                        word_type = self.word_type_dic[word_type]
+                    try:
+                        word_div = section.find('ul', class_='semb').find('div', class_='trg')
+                        defi = word_div.find('p').find('span', class_='ind one-click-content').text.lower()
+                        if word_type == 'verb':
+                            defi = 'to ' + defi
+                        full_definition += word_type + ':  ' + defi[:-1] + ";\n"
+                    except:
+                        pass
+                    #example
+                    try:
+                        example = word_div.find('div', class_='examples').find('li').text
+                        examples = '{}{};\n'.format(examples, example)
+                    except:
+                        pass
                 #creating note 
-            self.create_note(word, full_definition, examples)
+                if "_" in word:
+                    word = word.replace("_", " ")
+                self.create_note(word, full_definition, examples)
 
     def create_note(self, word, definition, example, output_file_name='output.apkg', guid=None):
         my_note = genanki.Note(

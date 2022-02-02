@@ -1,3 +1,4 @@
+from email.mime import audio
 import genanki
 import requests
 from bs4 import BeautifulSoup
@@ -21,7 +22,7 @@ class AnkiVocabulary:
             {'name': 'Word'},
             {'name': 'Full definition'},
             {'name': 'Examples'},
-
+            {'name': 'Music'},
         ],
         templates=[
             {
@@ -35,9 +36,15 @@ class AnkiVocabulary:
         self.my_deck = genanki.Deck(
             deck_id,
             deck_name)
+        self.package = genanki.Package(self.my_deck)
+        self.package.media_files = []
         #some os stuff
         if not os.path.exists(os.path.join(os.getcwd(), 'files')):
             os.mkdir('files')
+        if not os.path.exists(os.path.join(os.getcwd(), 'files', 'media')):
+            os.chdir('files')
+            os.mkdir('media')
+            os.chdir('../')
 
     def scrape(self):
         base_url = 'https://www.lexico.com/definition/{}'
@@ -61,6 +68,7 @@ class AnkiVocabulary:
                 sections = soup.find_all("section", class_='gramb')
                 full_definition = ''
                 examples = ''
+                audio_name = None
                 for section in sections:
                     word_type = section.find("span", class_='pos').text
                     if word_type in self.word_type_dic.keys():
@@ -79,18 +87,28 @@ class AnkiVocabulary:
                         examples = '{}{};\n'.format(examples, example)
                     except:
                         pass
+                #finding audio url and downloading
+                try: 
+                    audio_url = soup.find('a', class_='speaker').find('audio')['src']
+                    audio_name = audio_url.split('/')[-1]
+                    #downloading
+                    audio_content = requests.get(audio_url).content
+                    open('files/media/{}'.format(audio_name), 'wb').write(audio_content)
+                except:
+                    pass
                 #creating note 
                 if "_" in word:
                     word = word.replace("_", " ")
-                self.create_note(word, full_definition, examples)
+                self.create_note(word, full_definition, examples, audio_name)
 
-    def create_note(self, word, definition, example, output_file_name='output.apkg', guid=None):
+    def create_note(self, word, definition, example, audio_name, output_file_name='output.apkg', guid=None):
         my_note = genanki.Note(
             model=self.my_model,
-            fields=[word, definition, example],
+            fields=[word, definition, example,'[sound:{}]'.format(audio_name)],
             guid=guid)
         self.my_deck.add_note(my_note)
-        genanki.Package(self.my_deck).write_to_file('files/' + output_file_name)
+        self.package.media_files.append('files/media/{}'.format(audio_name))
+        self.package.write_to_file('files/' + output_file_name)
 
 
 #my own templates for GRE Vocabulary
@@ -100,7 +118,9 @@ my_afmt = """
 <hr id="answer"><div class="definition-example">Full definition</div><br>
 <div class="defition-example-actual">{{Full definition}}</div>
 <div class='definition-example'>Examples</div><br>
-<div class="defition-example-actual">{{Examples}}</div>"""
+<div class="defition-example-actual">{{Examples}}</div>
+<div>{{ Music }}</div>
+"""
 
 my_css = """
 .front-side{
@@ -141,5 +161,5 @@ word_type_dic = {
 }
 
 #making class obj
-anki = AnkiVocabulary(my_qfmt, my_afmt, my_css, 18, 'GRE Vocabulary', 19, word_type_dic)
+anki = AnkiVocabulary(my_qfmt, my_afmt, my_css, 18, 'media test', 22, word_type_dic)
 anki.scrape()

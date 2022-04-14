@@ -1,3 +1,3 @@
 # anki-card-adder
-  qw
+  qw\n
     qw

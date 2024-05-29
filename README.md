@@ -1,3 +1,2 @@
 # anki-card-adder
-  qw\n
-    qw
+Simple python program to add anki card of words and their definitions. 
